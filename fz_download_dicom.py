@@ -3,40 +3,20 @@ import asyncio
 import os
 import re
 import shutil
-import zipfile
 from collections import defaultdict
 from urllib.parse import urlparse, parse_qs
 
 from playwright.async_api import async_playwright
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+from common_utils import (
+    safe_name,
+    extract_share_id,
+    read_urls_file,
+    make_zip_dir,
+)
 
 
 # ================== 工具函数 ==================
-
-
-def safe_name(text: str) -> str:
-    """把 series 名字变成安全的文件夹名."""
-    text = re.sub(r"\s+", "_", (text or "").strip())
-    text = re.sub(r"[\\/:\*\?\"<>\|]", "_", text)
-    return text[:120] or "unnamed"
-
-
-def extract_share_id(url: str) -> str:
-    """从 URL 中尽力提取 share_id，用于目录名 / zip 名."""
-    parsed = urlparse(url)
-    qs = parse_qs(parsed.query)
-
-    for key in ("share_id", "shareId", "shareid"):
-        values = qs.get(key)
-        if values and values[0]:
-            return safe_name(values[0])
-
-    if parsed.path:
-        last_seg = parsed.path.strip("/").split("/")[-1]
-        if last_seg:
-            return safe_name(last_seg)
-
-    return safe_name(url)
 
 
 def looks_like_dicom_fast(data: bytes) -> bool:
@@ -255,32 +235,6 @@ async def get_slider_max(page) -> int | None:
         }
         """
     )
-
-
-def make_zip(folder: str, zip_path: str):
-    parent_dir = os.path.dirname(os.path.normpath(folder))
-    base_name = os.path.basename(os.path.normpath(folder))
-    os.makedirs(os.path.dirname(zip_path), exist_ok=True)
-
-    print(f">>> 正在打包为 zip：{zip_path}")
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for root, _, files in os.walk(folder):
-            for filename in files:
-                file_path = os.path.join(root, filename)
-                arcname = os.path.relpath(file_path, start=parent_dir)
-                zf.write(file_path, arcname)
-    print(">>> zip 打包完成！")
-
-
-def read_urls_file(path: str) -> list[str]:
-    urls = []
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            s = line.strip()
-            if not s or s.startswith("#"):
-                continue
-            urls.append(s)
-    return urls
 
 
 # ================== 核心下载逻辑 ==================
@@ -614,7 +568,7 @@ async def main():
 
             if not args.no_zip:
                 zip_path = os.path.join(out_parent, f"{share_id}.zip")
-                make_zip(out_dir, zip_path)
+                make_zip_dir(out_dir, zip_path)
 
     print("\n>>> 全部任务结束")
 
