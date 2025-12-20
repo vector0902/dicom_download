@@ -18,6 +18,12 @@ https://example.com/viewer?share_id=AAAA
 https://example.com/viewer?share_id=BBBB
 ```
 
+- 使用统一路由入口（自动按域名选择脚本/策略）：
+
+```bash
+python multi_download.py --urls-file urls.txt --out-parent ./downloads --headless
+```
+
 - 运行（以 fz 脚本为例，其他脚本参数相同或相近）：
 
 ```bash
@@ -57,6 +63,25 @@ python download_dicom.py "<URL>" --out-parent ./downloads --zip
   - `--concurrency`、`--download-retries`、`--http-timeout-ms`、`--retry-backoff-ms`
   - `--autoplay-rounds`、`--autoplay-delay-ms`、`--fallback-steps-per-round`
   - `--zip/--no-zip`、`--zip-dir`、`--verify/--no-verify`
+
+### 统一路由入口：multi_download.py
+- 自动按域名选择 provider（可用 `--provider tz|fz|nyfy` 覆盖）
+- 共享输出语义：每个 URL 一个子目录与独立 zip（除非 `--no-zip`）
+- 示例（参数可按需细调）：
+
+```bash
+python multi_download.py \
+  --urls-file urls.txt \
+  --out-parent ./downloads \
+  --headless \
+  --mode all \
+  --skip-hd \
+  --max-rounds 3 \
+  --step-wait-ms 40 \
+  --max-inflight 8 \
+  --nyfy-concurrency 4 \
+  --nyfy-download-retries 6
+```
 
 ### 目录与命名
 - 每个 URL 的子目录名使用 `share_id`（若无则路径最后段，再无则对 URL 做安全化）。
