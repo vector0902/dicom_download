@@ -31,7 +31,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     group = ap.add_mutually_exclusive_group(required=True)
     group.add_argument("--url", help="单个检查链接 URL")
-    group.add_argument("--urls-file", help="包含多个 URL 的文本文件（每行一个，支持 # 注释）")
+    group.add_argument(
+        "--urls-file", help="包含多个 URL 的文本文件（每行一个，支持 # 注释）"
+    )
 
     ap.add_argument(
         "--provider",
@@ -49,6 +51,42 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--no-headless", dest="headless", action="store_false")
     ap.set_defaults(headless=True)
 
+    # UI 抓取策略（tz/fz）参数
+    ap.add_argument("--skip-hd", action="store_true", help="跳过高清切换（fz 有效）")
+    ap.add_argument(
+        "--hd-timeout-ms", type=int, default=10000, help="高清切换超时（毫秒）"
+    )
+    ap.add_argument("--max-rounds", type=int, default=2, help="逐帧播放轮数上限（fz）")
+    ap.add_argument(
+        "--step-wait-ms", type=int, default=25, help="逐帧间隔（毫秒）（fz）"
+    )
+    ap.add_argument("--quiet-checks", type=int, default=6, help="静默观察次数（fz）")
+    ap.add_argument(
+        "--quiet-step-ms", type=int, default=800, help="静默观察间隔（毫秒）（fz）"
+    )
+    ap.add_argument(
+        "--max-inflight", type=int, default=6, help="抓取/写盘最大并发（fz）"
+    )
+    ap.add_argument(
+        "--overwrite", action="store_true", help="若输出目录存在则先删除（fz）"
+    )
+
+    # NYFY（WS+h5Cache）参数
+    ap.add_argument("--nyfy-concurrency", type=int, default=2, help="NYFY 下载并发")
+    ap.add_argument(
+        "--nyfy-download-retries", type=int, default=4, help="NYFY 重试次数"
+    )
+    ap.add_argument(
+        "--nyfy-http-timeout-ms", type=int, default=60000, help="NYFY HTTP 超时"
+    )
+    ap.add_argument(
+        "--nyfy-retry-backoff-ms", type=int, default=250, help="NYFY 重试退避（毫秒）"
+    )
+    ap.add_argument("--nyfy-backfill-rounds", type=int, default=5, help="NYFY 回填轮数")
+    ap.add_argument("--nyfy-verify", action="store_true", help="NYFY 下载后校验 DICOM")
+    ap.add_argument("--nyfy-no-verify", dest="nyfy_verify", action="store_false")
+    ap.set_defaults(nyfy_verify=False)
+
     ap.add_argument(
         "--out-parent",
         default="./downloads",
@@ -64,7 +102,7 @@ async def run_tz_one(url: str, out_dir: str, mode: str, headless: bool):
     )
 
 
-async def run_fz_one(url: str, out_dir: str, mode: str, headless: bool):
+async def run_fz_one(url: str, out_dir: str, mode: str, headless: bool, router_args):
     async with async_playwright() as p:
         await fz_mod.download_one(
             p=p,
@@ -72,35 +110,37 @@ async def run_fz_one(url: str, out_dir: str, mode: str, headless: bool):
             out_dir=out_dir,
             mode=mode,
             headless=headless,
-            skip_hd=False,
-            hd_timeout_ms=10000,
-            max_rounds=2,
-            step_wait_ms=25,
-            quiet_checks=6,
-            quiet_step_ms=800,
-            max_inflight=6,
-            overwrite=False,
+            skip_hd=router_args.skip_hd,
+            hd_timeout_ms=router_args.hd_timeout_ms,
+            max_rounds=router_args.max_rounds,
+            step_wait_ms=router_args.step_wait_ms,
+            quiet_checks=router_args.quiet_checks,
+            quiet_step_ms=router_args.quiet_step_ms,
+            max_inflight=router_args.max_inflight,
+            overwrite=router_args.overwrite,
         )
 
 
-async def run_nyfy_one(url: str, out_dir: str, headless: bool, zip_dir: str | None):
-    args = SimpleNamespace(
+async def run_nyfy_one(
+    url: str, out_dir: str, headless: bool, zip_dir: str | None, router_args
+):
+    args_ns = SimpleNamespace(
         url=url,
         out_dir=out_dir,
         password=None,
         headless=headless,
-        concurrency=2,
-        download_retries=4,
-        http_timeout_ms=60000,
-        retry_backoff_ms=250,
+        concurrency=router_args.nyfy_concurrency,
+        download_retries=router_args.nyfy_download_retries,
+        http_timeout_ms=router_args.nyfy_http_timeout_ms,
+        retry_backoff_ms=router_args.nyfy_retry_backoff_ms,
         autoplay_rounds=3,
         autoplay_delay_ms=90,
         quiet_wait_ms=1500,
         fallback_steps_per_round=900,
-        backfill_rounds=5,
+        backfill_rounds=router_args.nyfy_backfill_rounds,
         zip=False,  # 统一由 router 打包
         zip_dir=zip_dir or ".",
-        verify=False,
+        verify=router_args.nyfy_verify,
         verify_report="verify_report.json",
         ct_intercept=0.0,
         ct_slope=1.0,
@@ -108,10 +148,10 @@ async def run_nyfy_one(url: str, out_dir: str, headless: bool, zip_dir: str | No
         verbose=False,
     )
 
-    d = nyfy_mod.Downloader(args)
+    d = nyfy_mod.Downloader(args_ns)
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=args.headless)
+        browser = await p.chromium.launch(headless=args_ns.headless)
         context = await browser.new_context(
             viewport={"width": 1400, "height": 900}, ignore_https_errors=True
         )
@@ -132,7 +172,7 @@ async def run_nyfy_one(url: str, out_dir: str, headless: bool, zip_dir: str | No
         print(">>> 打开检查页面:", url)
         await nyfy_mod.safe_goto(page, url)
         await nyfy_mod.maybe_click_dialog_button(page, "我知道了", timeout_ms=1500)
-        await nyfy_mod.handle_password_if_needed(page, args.password)
+        await nyfy_mod.handle_password_if_needed(page, args_ns.password)
 
         frame = await nyfy_mod.get_viewer_frame(page)
         print(">>> 已进入 viewer iframe")
@@ -140,7 +180,7 @@ async def run_nyfy_one(url: str, out_dir: str, headless: bool, zip_dir: str | No
         referer = url
         workers = [
             asyncio.create_task(d.worker(context.request, referer))
-            for _ in range(max(1, args.concurrency))
+            for _ in range(max(1, args_ns.concurrency))
         ]
         hb = asyncio.create_task(d.heartbeat())
 
@@ -156,7 +196,7 @@ async def run_nyfy_one(url: str, out_dir: str, headless: bool, zip_dir: str | No
         print(
             f">>> DONE: meta={len(d.meta_by_uid)} saved={len(d.saved_uids)} failed={len(d.failed)}"
         )
-        if d.failed_status and not args.quiet:
+        if d.failed_status and not args_ns.quiet:
             print(">>> HTTP status summary:", dict(d.failed_status))
 
         await browser.close()
@@ -195,11 +235,11 @@ async def main():
             if prov == "tz":
                 await run_tz_one(url, out_dir, args.mode, args.headless)
             elif prov == "fz":
-                await run_fz_one(url, out_dir, args.mode, args.headless)
+                await run_fz_one(url, out_dir, args.mode, args.headless, args)
             elif prov == "nyfy":
-                await run_nyfy_one(url, out_dir, args.headless, out_parent)
+                await run_nyfy_one(url, out_dir, args.headless, out_parent, args)
             else:
-                await run_fz_one(url, out_dir, args.mode, args.headless)
+                await run_fz_one(url, out_dir, args.mode, args.headless, args)
         except Exception as e:
             print(f">>> ❌ 失败：{url}")
             print(f">>> 错误：{e}")
