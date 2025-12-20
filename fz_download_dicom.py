@@ -467,7 +467,7 @@ def parse_args():
     parser.add_argument(
         "--no-headless", dest="headless", action="store_false", help="有界面模式运行"
     )
-    parser.set_defaults(headless=True)
+    parser.set_defaults(headless=False)
 
     parser.add_argument(
         "--skip-hd", action="store_true", help="跳过“流畅->原图(清晰度高)”切换"

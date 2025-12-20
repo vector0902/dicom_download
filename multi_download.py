@@ -49,7 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument("--headless", action="store_true", help="无界面模式运行")
     ap.add_argument("--no-headless", dest="headless", action="store_false")
-    ap.set_defaults(headless=True)
+    ap.set_defaults(headless=False)
 
     # UI 抓取策略（tz/fz）参数
     ap.add_argument("--skip-hd", action="store_true", help="跳过高清切换（fz 有效）")

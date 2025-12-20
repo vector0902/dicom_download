@@ -21,13 +21,13 @@ https://example.com/viewer?share_id=BBBB
 - 使用统一路由入口（自动按域名选择脚本/策略）：
 
 ```bash
-python multi_download.py --urls-file urls.txt --out-parent ./downloads --headless
+python multi_download.py --urls-file urls.txt --out-parent ./downloads
 ```
 
 - 运行（以 fz 脚本为例，其他脚本参数相同或相近）：
 
 ```bash
-python fz_download_dicom.py --urls-file urls.txt --out-parent ./downloads --headless
+python fz_download_dicom.py --urls-file urls.txt --out-parent ./downloads
 ```
 
 行为说明：
@@ -38,7 +38,7 @@ python fz_download_dicom.py --urls-file urls.txt --out-parent ./downloads --head
 ### 单 URL（快速尝试）
 - tz（zlyy）：
 ```bash
-python tz_download_dicom.py -u "<URL>" -o output_tz --mode diag --headless
+python tz_download_dicom.py -u "<URL>" -o output_tz --mode diag
 ```
 - fz（shdc）：
 ```bash
@@ -73,7 +73,6 @@ python download_dicom.py "<URL>" --out-parent ./downloads --zip
 python multi_download.py \
   --urls-file urls.txt \
   --out-parent ./downloads \
-  --headless \
   --mode all \
   --skip-hd \
   --max-rounds 3 \
