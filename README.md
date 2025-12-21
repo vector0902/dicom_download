@@ -24,6 +24,8 @@ https://example.com/viewer?share_id=AAAA
 https://example.com/viewer?share_id=BBBB
 ```
 
+- 注意：上面是示例占位链接，实际使用时请把 `urls.txt`（或你自己的 `URLS.txt`）里的链接替换成**你自己的真实分享链接**，否则无法下载。
+
 - 使用统一路由入口（自动按域名选择脚本/策略）：
 
 ```bash
