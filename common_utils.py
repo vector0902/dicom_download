@@ -1,6 +1,7 @@
 import os
 import re
 import zipfile
+import hashlib
 from urllib.parse import urlparse, parse_qs
 
 
@@ -21,25 +22,61 @@ def safe_name(text: str, max_len: int = 120) -> str:
 def extract_share_id(url: str) -> str:
     """
     从 URL 中尽力提取一个稳定的标识，用于每个 URL 的输出目录/zip 名。
-    规则：
-      1) 优先取 query 中的 share_id / shareId / shareid
-      2) 否则取路径最后一段
-      3) 否则回退到整个 URL 的 safe_name
+    目标：尽量可读且避免覆盖（唯一性优先）。
+
+    规则（方案 A：host + 关键参数 + 短哈希）：
+      1) 提取 host（含端口）
+      2) 从 query 与 fragment 中优先找常见的唯一参数（share_id/shareId/shareid/dignosis/diagnosis/data/id/rt/et）
+      3) 追加 URL 的短哈希（sha1 前 10 位），保证同名不覆盖
+
+    返回值会经过 safe_name 处理，并限制长度。
     """
     parsed = urlparse(url)
+    host = parsed.netloc or "unknown_host"
+
+    # query 参数
     qs = parse_qs(parsed.query)
 
-    for key in ("share_id", "shareId", "shareid"):
-        values = qs.get(key)
+    # fragment 里也可能带 query（如：#/image?data=...）
+    frag_qs = {}
+    if parsed.fragment and "?" in parsed.fragment:
+        frag_query = parsed.fragment.split("?", 1)[1]
+        frag_qs = parse_qs(frag_query)
+
+    merged = {}
+    merged.update(qs)
+    # fragment 优先级更高：很多 SPA 会把关键参数放到 fragment
+    for k, v in frag_qs.items():
+        merged[k] = v
+
+    preferred_keys = (
+        "share_id",
+        "shareId",
+        "shareid",
+        "dignosis",
+        "diagnosis",
+        "data",
+        "id",
+        "rt",
+        "et",
+    )
+
+    chosen_val = ""
+    for key in preferred_keys:
+        values = merged.get(key)
         if values and values[0]:
-            return safe_name(values[0])
+            chosen_val = str(values[0])
+            break
 
-    if parsed.path:
-        last_seg = parsed.path.strip("/").split("/")[-1]
-        if last_seg:
-            return safe_name(last_seg)
+    # 控制可读部分的长度（最终仍会加 hash 保证唯一）
+    if chosen_val:
+        chosen_val = chosen_val[:32]
 
-    return safe_name(url)
+    h = hashlib.sha1((url or "").encode("utf-8", errors="ignore")).hexdigest()[:10]
+
+    if chosen_val:
+        return safe_name(f"{host}_{chosen_val}_{h}", max_len=120)
+    return safe_name(f"{host}_{h}", max_len=120)
 
 
 def read_urls_file(path: str) -> list[str]:

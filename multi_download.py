@@ -8,11 +8,6 @@ from playwright.async_api import async_playwright
 
 from common_utils import extract_share_id, read_urls_file, make_zip_dir
 
-# providers
-import tz_download_dicom as tz_mod
-import fz_download_dicom as fz_mod
-import download_dicom as nyfy_mod
-
 
 def detect_provider(url: str) -> str:
     host = urlparse(url).netloc.lower()
@@ -97,12 +92,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 async def run_tz_one(url: str, out_dir: str, mode: str, headless: bool):
+    # 延迟导入：避免在仅运行 fz/nyfy 时引入 tz 的重依赖（如 pydicom/numpy）
+    import tz_download_dicom as tz_mod
+
     await tz_mod.run_downloader(
         check_url=url, out_root=out_dir, download_mode=mode, headless=headless
     )
 
 
 async def run_fz_one(url: str, out_dir: str, mode: str, headless: bool, router_args):
+    # 延迟导入：避免只运行其他 provider 时加载不必要的模块
+    import fz_download_dicom as fz_mod
+
     async with async_playwright() as p:
         await fz_mod.download_one(
             p=p,
@@ -124,6 +125,9 @@ async def run_fz_one(url: str, out_dir: str, mode: str, headless: bool, router_a
 async def run_nyfy_one(
     url: str, out_dir: str, headless: bool, zip_dir: str | None, router_args
 ):
+    # 延迟导入：避免只运行其他 provider 时加载不必要的模块
+    import download_dicom as nyfy_mod
+
     args_ns = SimpleNamespace(
         url=url,
         out_dir=out_dir,
