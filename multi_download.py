@@ -1,6 +1,11 @@
 import argparse
 import asyncio
 import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import urlparse
 
@@ -17,7 +22,24 @@ def detect_provider(url: str) -> str:
         return "nyfy"
     if host.endswith("shdc.org.cn") or "ylyyx.shdc.org.cn" in host:
         return "fz"
-    return "fz"  # 默认按 fz 策略尝试
+
+    # cloud-dicom-downloader 支持的站点（保持与其 downloader.py 的路由一致）
+    if host.endswith(".medicalimagecloud.com"):
+        return "cloud"
+    if host in (
+        "mdmis.cq12320.cn",
+        "qr.szjudianyun.com",
+        "zscloud.zs-hospital.sh.cn",
+        "app.ftimage.cn",
+        "yyx.ftimage.cn",
+        "m.yzhcloud.com",
+        "ss.mtywcloud.com",
+        "work.sugh.net",
+        "cloudpacs.jdyfy.com",
+    ):
+        return "cloud"
+
+    return "fz"  # 兜底：按 fz 策略尝试
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -32,7 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     ap.add_argument(
         "--provider",
-        choices=["auto", "tz", "fz", "nyfy"],
+        choices=["auto", "tz", "fz", "nyfy", "cloud"],
         default="auto",
         help="手动指定提供者（默认 auto：按域名自动识别）",
     )
@@ -64,6 +86,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument(
         "--overwrite", action="store_true", help="若输出目录存在则先删除（fz）"
+    )
+
+    # cloud-dicom-downloader（子进程）参数
+    ap.add_argument(
+        "--cloud-password",
+        default=None,
+        help="cloud provider 密码（仅 *.medicalimagecloud.com 这类链接必需）",
+    )
+    ap.add_argument(
+        "--cloud-raw",
+        action="store_true",
+        help="cloud provider 下载 raw（上游 --raw；默认下载 JPEG2000 无损）",
+    )
+    ap.add_argument(
+        "--cloud-keep-temp",
+        action="store_true",
+        help="cloud provider 失败/调试时保留临时目录（打印路径）",
     )
 
     # NYFY（WS+h5Cache）参数
@@ -206,6 +245,106 @@ async def run_nyfy_one(
         await browser.close()
 
 
+def _cloud_downloader_path() -> Path:
+    """
+    返回 cloud-dicom-downloader/downloader.py 的绝对路径。
+    以脚本所在目录为基准，避免从不同 cwd 运行时找不到。
+    """
+    here = Path(__file__).resolve().parent
+    return here / "cloud-dicom-downloader" / "downloader.py"
+
+
+def _move_cloud_download_to_out(
+    tmp_workdir: Path, out_dir: Path, overwrite: bool
+) -> None:
+    """
+    上游默认写到 tmp_workdir/download/<study_dir>/...，这里把 <study_dir> 迁移为 out_dir。
+    由于 out_dir 是 per-URL 的唯一目录，我们以“整目录替换”为主策略。
+    """
+    download_root = tmp_workdir / "download"
+    if not download_root.exists():
+        raise RuntimeError(f"cloud: 未产生 download 目录：{download_root}")
+
+    candidates = [p for p in download_root.iterdir() if p.is_dir()]
+    if not candidates:
+        raise RuntimeError(f"cloud: download 目录为空：{download_root}")
+
+    # 通常只有一个检查目录；若多个则选最新的那个
+    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    study_dir = candidates[0]
+
+    if out_dir.exists():
+        has_any = any(out_dir.iterdir())
+        if has_any and (not overwrite):
+            raise RuntimeError(
+                f"输出目录已存在且非空：{out_dir}。如需覆盖请加 --overwrite"
+            )
+        if overwrite:
+            shutil.rmtree(out_dir, ignore_errors=True)
+
+    out_dir.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(study_dir), str(out_dir))
+
+
+def run_cloud_one(url: str, out_dir: str, router_args) -> None:
+    """
+    方式B：子进程运行 cloud-dicom-downloader/downloader.py，工作目录指向临时目录以控制输出，
+    运行后将 tmp/download 下的结果迁移到 out_dir。
+    """
+    downloader_py = _cloud_downloader_path()
+    if not downloader_py.exists():
+        raise RuntimeError(f"未找到上游 downloader.py：{downloader_py}")
+
+    host = urlparse(url).netloc.lower()
+
+    cmd = [sys.executable, str(downloader_py), url]
+    if host.endswith(".medicalimagecloud.com"):
+        if not router_args.cloud_password:
+            raise RuntimeError(
+                "cloud: 该链接需要密码（*.medicalimagecloud.com），请提供 --cloud-password"
+            )
+        cmd.append(router_args.cloud_password)
+
+    if router_args.cloud_raw:
+        cmd.append("--raw")
+
+    out_path = Path(out_dir).resolve()
+    tmp_dir_obj = tempfile.TemporaryDirectory(prefix="cloud_dicom_")
+    tmp_workdir = Path(tmp_dir_obj.name)
+
+    try:
+        # 在临时目录作为 cwd 运行，上游会把文件写到 ./download/...
+        # 但脚本路径是绝对路径，因此 import crawlers 仍然从脚本目录解析（可用）。
+        proc = subprocess.run(
+            cmd,
+            cwd=str(tmp_workdir),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        if proc.returncode != 0:
+            tail = "\n".join((proc.stderr or "").splitlines()[-60:])
+            raise RuntimeError(
+                f"cloud 子进程失败（exit={proc.returncode}）。stderr tail:\n{tail}"
+            )
+
+        _move_cloud_download_to_out(
+            tmp_workdir, out_path, overwrite=router_args.overwrite
+        )
+    except Exception:
+        if router_args.cloud_keep_temp:
+            print(f"[cloud] 保留临时目录用于调试：{tmp_workdir}")
+            # 不清理
+            tmp_dir_obj.cleanup = lambda: None  # type: ignore
+        raise
+    finally:
+        try:
+            tmp_dir_obj.cleanup()
+        except Exception:
+            pass
+
+
 async def main():
     ap = build_parser()
     args = ap.parse_args()
@@ -242,6 +381,9 @@ async def main():
                 await run_fz_one(url, out_dir, args.mode, args.headless, args)
             elif prov == "nyfy":
                 await run_nyfy_one(url, out_dir, args.headless, out_parent, args)
+            elif prov == "cloud":
+                # cloud-dicom-downloader 走子进程（方式B）
+                run_cloud_one(url, out_dir, args)
             else:
                 await run_fz_one(url, out_dir, args.mode, args.headless, args)
         except Exception as e:

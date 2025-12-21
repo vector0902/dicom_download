@@ -49,10 +49,18 @@ def test_multi_download_routing_and_outputs(tmp_path, monkeypatch):
     monkeypatch.setattr(md, "run_fz_one", fake_run)
     monkeypatch.setattr(md, "run_nyfy_one", fake_run)
 
+    def fake_run_cloud(url, out_dir, args):
+        p = Path(out_dir) / "ok.txt"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("ok", encoding="utf-8")
+
+    monkeypatch.setattr(md, "run_cloud_one", fake_run_cloud)
+
     urls = [
         "https://zlyy.tjmucih.cn/viewer?shareId=AA",
         "https://zhyl.nyfy.com.cn/viewer?share_id=BB",
         "https://ylyyx.shdc.org.cn/view/CC",
+        "https://mdmis.cq12320.cn/wcs1/mdmis-app/h5/#/share/detail?share_id=DD&content=EE&channel=share",
     ]
 
     urls_file = tmp_path / "urls.txt"
