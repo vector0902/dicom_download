@@ -72,7 +72,9 @@ def build_parser() -> argparse.ArgumentParser:
     ap.set_defaults(headless=False)
 
     # UI 抓取策略（天肿/复肿；tz/fz）参数
-    ap.add_argument("--skip-hd", action="store_true", help="跳过高清切换（复肿 fz 有效）")
+    ap.add_argument(
+        "--skip-hd", action="store_true", help="跳过高清切换（复肿 fz 有效）"
+    )
     ap.add_argument(
         "--hd-timeout-ms", type=int, default=10000, help="高清切换超时（毫秒）"
     )
@@ -82,7 +84,9 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--step-wait-ms", type=int, default=25, help="逐帧间隔（毫秒）（复肿 fz）"
     )
-    ap.add_argument("--quiet-checks", type=int, default=6, help="静默观察次数（复肿 fz）")
+    ap.add_argument(
+        "--quiet-checks", type=int, default=6, help="静默观察次数（复肿 fz）"
+    )
     ap.add_argument(
         "--quiet-step-ms", type=int, default=800, help="静默观察间隔（毫秒）（复肿 fz）"
     )
@@ -115,7 +119,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--nyfy-concurrency", type=int, default=2, help="宁夏总医院（nyfy）下载并发"
     )
     ap.add_argument(
-        "--nyfy-download-retries", type=int, default=4, help="宁夏总医院（nyfy）重试次数"
+        "--nyfy-download-retries",
+        type=int,
+        default=4,
+        help="宁夏总医院（nyfy）重试次数",
     )
     ap.add_argument(
         "--nyfy-http-timeout-ms",
