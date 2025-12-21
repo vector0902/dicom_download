@@ -64,6 +64,15 @@ python nyfy_download_dicom.py "<URL>" --out-parent ./downloads --zip
   - `--autoplay-rounds`、`--autoplay-delay-ms`、`--fallback-steps-per-round`
   - `--zip/--no-zip`、`--zip-dir`、`--verify/--no-verify`
 
+### 默认行为与“密码/登录”提示（建议先读）
+- 默认会**打开浏览器**（`headless=False`）。如在服务器/无桌面环境运行，建议显式加 `--headless`（或使用带桌面的环境）。
+- 默认会为**每个 URL 生成一个 zip**（除非 `--no-zip`）。
+- 天肿（tz / `tjmucih_download_dicom.py`）的 `--mode` 默认是 `diag`：只点击/触发“诊断类”序列；如果你期望“尽量全下”，请用 `--mode all`。
+- 遇到需要“分享密码/登录校验”的链接：
+  - **宁夏总医院（nyfy）**：不传 `--password` 时需要你在浏览器里手动输入并点击“验证密码”。脚本默认等待弹窗关闭约 **120 秒**，超时会失败；建议直接传 `--password` 或尽快完成验证。
+  - **天肿（tz）**：脚本没有单独的密码弹窗处理逻辑；若页面被密码/登录页拦住，通常会在等待关键元素时（约 **20 秒**）超时失败。建议提前在浏览器里完成验证后再重跑，或尽快完成页面前置步骤。
+  - **cloud provider（*.medicalimagecloud.com）**：必须提供 `--cloud-password`，否则会直接报错退出（不支持手动输入流程）。
+
 ### 统一路由入口：multi_download.py
 - 自动按域名选择 provider（可用 `--provider tz|fz|nyfy` 覆盖；其中 tz=天肿、fz=复肿、nyfy=宁夏总医院）
 - 共享输出语义：每个 URL 一个子目录与独立 zip（除非 `--no-zip`）
