@@ -354,7 +354,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--mode",
         choices=["diag", "nondiag", "all"],
-        default="diag",
+        default="all",
         help="下载模式（主要影响“点哪些序列”）："
         "diag=临床诊断序列；nondiag=辅助序列；all=全部",
     )
