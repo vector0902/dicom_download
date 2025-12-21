@@ -77,19 +77,10 @@ python nyfy_download_dicom.py "<URL>" --out-parent ./downloads --zip
 ### 统一路由入口：multi_download.py
 - 自动按域名选择 provider（可用 `--provider tz|fz|nyfy` 覆盖；其中 tz=天肿、fz=复肿、nyfy=宁夏总医院）
 - 共享输出语义：每个 URL 一个子目录与独立 zip（除非 `--no-zip`）
-- 示例（参数可按需细调）：
+- 示例：
 
 ```bash
-python multi_download.py \
-  --urls-file urls.txt \
-  --out-parent ./downloads \
-  --mode all \
-  --skip-hd \
-  --max-rounds 3 \
-  --step-wait-ms 40 \
-  --max-inflight 8 \
-  --nyfy-concurrency 4 \
-  --nyfy-download-retries 6
+python multi_download.py --urls-file urls.txt --out-parent ./downloads
 ```
 
 ### cloud provider（融合 cloud-dicom-downloader，上游已停止维护）
