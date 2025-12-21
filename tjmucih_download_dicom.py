@@ -64,7 +64,10 @@ async def open_series_panel(page):
     面板默认就是展开的，这里只负责等待它加载完成。
     """
     buttons = page.locator("div.listbtn button.rightbutton")
-    await buttons.first.wait_for(state="visible", timeout=20000)
+    # 若页面被“分享密码/登录校验”拦住，需要你在浏览器里手动完成后才能进入 viewer。
+    # 这里把等待窗口拉长到与 nyfy 类似的 120s，避免 20s 来不及输入就失败。
+    print(">>> 如页面需要密码/登录，请在浏览器里完成验证（脚本将等待最多 120 秒）...")
+    await buttons.first.wait_for(state="visible", timeout=120000)
     print(">>> 序列面板已就绪")
 
 
@@ -229,7 +232,8 @@ async def run_downloader(
 
         page = await context.new_page()
         print(f">>> 打开检查页面: {check_url}")
-        await page.goto(check_url, wait_until="networkidle")
+        # 拉长导航超时，避免遇到密码/登录校验或网络波动时过早失败
+        await page.goto(check_url, wait_until="networkidle", timeout=120000)
 
         # 读取 UI 序列列表，用来“走片”触发剩余切片的加载
         series_list = await read_series_list(page)
