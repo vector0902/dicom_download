@@ -1,11 +1,11 @@
 ## 贡献指南：如何新增一家医院/厂商的适配
 
 本项目目前有两类下载策略，你需要先判断目标站点的阅片器实现属于哪一类，然后选最近似的脚本作为模板：
-- UI 响应抓取策略（类似 `tz_download_dicom.py` / `fz_download_dicom.py`）
+- UI 响应抓取策略（类似 `tjmucih_download_dicom.py` / `shdc_download_dicom.py`）
   - 通过 Playwright 操作 UI（展开序列面板、点击序列、滑块逐帧）来触发网络请求；
   - 从响应体中识别 DICOM（快速头判断），直接落盘为 `.dcm` 文件；
   - 常见差异点：DOM 选择器、高清开关、分页/滑块行为、同源/跨域路径过滤等。
-- WS + h5Cache 策略（类似 `download_dicom.py`）
+- WS + h5Cache 策略（类似 `nyfy_download_dicom.py`）
   - 监听 WebSocket 帧，解析影像元数据（Study/Series/SOP 等），补齐 `furl`；
   - 通过 HTTP 拉取像素数据，组装为 Part 10 DICOM（写入 UID/像素/空间信息等）。
 
@@ -16,8 +16,9 @@
   - 网络请求里是否有明显的 DICOM/像素数据响应（通过文件头快速判断）。
 
 ### 步骤 2：选择模板并创建适配器
-- UI 响应抓取型：以 `fz_download_dicom.py` 为模板（支持滑块逐帧与高清切换），或 `tz_download_dicom.py`（右侧按钮列表）。
-- WS+h5Cache 型：以 `download_dicom.py` 为模板。
+- UI 响应抓取型：以 `shdc_download_dicom.py` 为模板（支持滑块逐帧与高清切换），或 `tjmucih_download_dicom.py`（右侧按钮列表）。
+- UI 响应抓取型：以 `shdc_download_dicom.py` 为模板（支持滑块逐帧与高清切换），或 `tjmucih_download_dicom.py`（右侧按钮列表）。
+- WS+h5Cache 型：以 `nyfy_download_dicom.py` 为模板。
 - 复制出新的脚本文件（或将逻辑并入统一入口 `multi_download.py` 的某 provider）。
 
 ### 步骤 3：填写选择器/规则与站点参数

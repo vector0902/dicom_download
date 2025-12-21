@@ -3,11 +3,11 @@
 
 ### 已适配站点与脚本
 - zlyy.tjmucih.cn（圆心云影 PC 右侧按钮列表）
-  - 脚本：`tz_download_dicom.py`
+  - 脚本：`tjmucih_download_dicom.py`
 - ylyyx.shdc.org.cn（底部序列面板 + 高清切换 + 滑块逐帧）
-  - 脚本：`fz_download_dicom.py`
+  - 脚本：`shdc_download_dicom.py`
 - zhyl.nyfy.com.cn（WebSocket 元数据 + h5Cache 拉原始像素 + 组 Part10 DICOM）
-  - 脚本：`download_dicom.py`
+  - 脚本：`nyfy_download_dicom.py`
 
 ### 多 URL 批处理（推荐）
 - 准备 `urls.txt`（每行一个 URL，支持 `#` 注释）：
@@ -27,7 +27,7 @@ python multi_download.py --urls-file urls.txt --out-parent ./downloads
 - 运行（以 fz 脚本为例，其他脚本参数相同或相近）：
 
 ```bash
-python fz_download_dicom.py --urls-file urls.txt --out-parent ./downloads
+python shdc_download_dicom.py --urls-file urls.txt --out-parent ./downloads
 ```
 
 行为说明：
@@ -38,15 +38,15 @@ python fz_download_dicom.py --urls-file urls.txt --out-parent ./downloads
 ### 单 URL（快速尝试）
 - tz（zlyy）：
 ```bash
-python tz_download_dicom.py -u "<URL>" -o output_tz --mode diag
+python tjmucih_download_dicom.py -u "<URL>" -o output_tz --mode diag
 ```
 - fz（shdc）：
 ```bash
-python fz_download_dicom.py --url "<URL>" --out-parent ./downloads --headless
+python shdc_download_dicom.py --url "<URL>" --out-parent ./downloads --headless
 ```
 - nyfy（zhyl，WS+h5Cache）：
 ```bash
-python download_dicom.py "<URL>" --out-parent ./downloads --zip
+python nyfy_download_dicom.py "<URL>" --out-parent ./downloads --zip
 ```
 
 ### 常用参数
@@ -59,7 +59,7 @@ python download_dicom.py "<URL>" --out-parent ./downloads --zip
   - `--mode diag|nondiag|all`：按 UI 粗略分类决定“点哪些序列”
   - `--skip-hd`/`--hd-timeout-ms`：是否尝试切换“原图(清晰度高)”及超时
   - `--max-rounds`、`--step-wait-ms`、`--quiet-checks`、`--quiet-step-ms`：逐帧播放与静默观察控制
-- WS+h5Cache 策略（download_dicom.py）：
+- WS+h5Cache 策略（nyfy_download_dicom.py）：
   - `--concurrency`、`--download-retries`、`--http-timeout-ms`、`--retry-backoff-ms`
   - `--autoplay-rounds`、`--autoplay-delay-ms`、`--fallback-steps-per-round`
   - `--zip/--no-zip`、`--zip-dir`、`--verify/--no-verify`
