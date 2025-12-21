@@ -82,6 +82,32 @@ python multi_download.py \
   --nyfy-download-retries 6
 ```
 
+### cloud provider（融合 cloud-dicom-downloader，上游已停止维护）
+说明：
+- `multi_download.py` 会对部分域名自动路由到 `cloud` provider（也可 `--provider cloud` 强制）。
+- cloud provider 使用“子进程方式（方式B）”运行上游 `cloud-dicom-downloader/downloader.py`：
+  - 子进程在**临时工作目录**运行，上游会写死输出到 `./download/...`
+  - 运行结束后，外壳会把 `tmp/download/<study_dir>` **整体搬运**到本项目的 per-URL `out_dir`
+  - 最后仍由外壳统一打 zip，命名使用唯一 ID（避免覆盖）
+
+常用参数：
+- `--cloud-password`：仅 `*.medicalimagecloud.com` 这类链接必需
+- `--cloud-raw`：透传上游 `--raw`（下载未压缩像素）
+- `--cloud-keep-temp`：失败/调试时保留临时目录并打印路径
+
+示例：
+
+```bash
+# 自动路由（urls.txt 中混合多站点）
+python multi_download.py --urls-file urls.txt --out-parent ./downloads
+
+# 强制走 cloud（调试）
+python multi_download.py --url "<URL>" --provider cloud --cloud-keep-temp
+
+# medicalimagecloud 需要密码
+python multi_download.py --url "<URL>" --provider cloud --cloud-password "<PWD>"
+```
+
 ### 目录与命名
 - 每个 URL 的子目录名使用 `share_id`（若无则路径最后段，再无则对 URL 做安全化）。
 - 文件/目录命名采用统一的安全规则：空白转下划线、非法字符过滤、长度限制。
