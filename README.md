@@ -90,6 +90,7 @@ python multi_download.py --urls-file urls.txt --out-parent ./downloads
 
 ### cloud provider（融合 cloud-dicom-downloader，上游已停止维护）
 说明：
+- 致谢：本项目的 cloud provider 能力来自对开源项目 [Kaciras/cloud-dicom-downloader](https://github.com/Kaciras/cloud-dicom-downloader) 的融合与适配，感谢原作者与贡献者。
 - 上游项目 `cloud-dicom-downloader` 作者已明确 **不再更新/不再维护**，本项目以“兼容层”的方式融合其能力，便于继续扩展更多站点。
 - `multi_download.py` 会对部分域名自动路由到 `cloud` provider（也可 `--provider cloud` 强制）。
 - cloud provider 使用“子进程方式（方式B）”运行上游 `cloud-dicom-downloader/downloader.py`：
