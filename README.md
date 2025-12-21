@@ -24,7 +24,7 @@ https://example.com/viewer?share_id=BBBB
 python multi_download.py --urls-file urls.txt --out-parent ./downloads
 ```
 
-- 运行（以 fz 脚本为例，其他脚本参数相同或相近）：
+- 运行（以复肿（fz）脚本为例，其他脚本参数相同或相近）：
 
 ```bash
 python shdc_download_dicom.py --urls-file urls.txt --out-parent ./downloads
@@ -36,15 +36,15 @@ python shdc_download_dicom.py --urls-file urls.txt --out-parent ./downloads
 - 共享选项：`--no-zip` 关闭打包；`--headless/--no-headless` 控制浏览器模式
 
 ### 单 URL（快速尝试）
-- tz（zlyy）：
+- 天肿（tz，zlyy.tjmucih.cn）：
 ```bash
 python tjmucih_download_dicom.py -u "<URL>" -o output_tz --mode diag
 ```
-- fz（shdc）：
+- 复肿（fz，ylyyx.shdc.org.cn）：
 ```bash
 python shdc_download_dicom.py --url "<URL>" --out-parent ./downloads --headless
 ```
-- nyfy（zhyl，WS+h5Cache）：
+- 宁夏总医院（nyfy，zhyl.nyfy.com.cn，WS+h5Cache）：
 ```bash
 python nyfy_download_dicom.py "<URL>" --out-parent ./downloads --zip
 ```
@@ -55,7 +55,7 @@ python nyfy_download_dicom.py "<URL>" --out-parent ./downloads --zip
   - `--out-parent`：多 URL 输出父目录（默认 `./downloads`）
   - `--no-zip` 或 `--zip/--no-zip`：是否为每个 URL 生成独立 zip
   - `--headless/--no-headless`：无界面/有界面模式
-- UI 响应抓取策略（tz/fz）：
+- UI 响应抓取策略（天肿/复肿；tz/fz）：
   - `--mode diag|nondiag|all`：按 UI 粗略分类决定“点哪些序列”
   - `--skip-hd`/`--hd-timeout-ms`：是否尝试切换“原图(清晰度高)”及超时
   - `--max-rounds`、`--step-wait-ms`、`--quiet-checks`、`--quiet-step-ms`：逐帧播放与静默观察控制
@@ -65,7 +65,7 @@ python nyfy_download_dicom.py "<URL>" --out-parent ./downloads --zip
   - `--zip/--no-zip`、`--zip-dir`、`--verify/--no-verify`
 
 ### 统一路由入口：multi_download.py
-- 自动按域名选择 provider（可用 `--provider tz|fz|nyfy` 覆盖）
+- 自动按域名选择 provider（可用 `--provider tz|fz|nyfy` 覆盖；其中 tz=天肿、fz=复肿、nyfy=宁夏总医院）
 - 共享输出语义：每个 URL 一个子目录与独立 zip（除非 `--no-zip`）
 - 示例（参数可按需细调）：
 
@@ -116,7 +116,8 @@ python multi_download.py --url "<URL>" --provider cloud --cloud-password "<PWD>"
 ### 注意事项
 - 不要提交任何包含 PHI/敏感信息的数据样本。
 - 不同站点 UI 有差异，若遇到选择器变更或策略不适配，可反馈或调整对应脚本的选择器/策略参数。
-- cloud provider 依赖上游已停止维护的实现，若与本项目已有实现（tz/fz/nyfy）重叠，则优先以本项目实现为准。
+- cloud provider 依赖上游已停止维护的实现，若与本项目已有实现（天肿/复肿/宁夏总医院；tz/fz/nyfy）重叠，则优先以本项目实现为准。
 
 ### 贡献
 - 如何新增一家医院/厂商适配，请参见 `CONTRIBUTING.md`。
+- 如需支持新的医院/站点，请先新开 issue，并提供有效期尽量长的测试链接（便于排查与回归）。

@@ -56,7 +56,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--provider",
         choices=["auto", "tz", "fz", "nyfy", "cloud"],
         default="auto",
-        help="手动指定提供者（默认 auto：按域名自动识别）",
+        help=(
+            "手动指定 provider（默认 auto：按域名自动识别）。"
+            "tz=天肿(zlyy.tjmucih.cn)，fz=复肿(ylyyx.shdc.org.cn)，nyfy=宁夏总医院(zhyl.nyfy.com.cn)"
+        ),
     )
     ap.add_argument(
         "--mode",
@@ -68,24 +71,26 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--no-headless", dest="headless", action="store_false")
     ap.set_defaults(headless=False)
 
-    # UI 抓取策略（tz/fz）参数
-    ap.add_argument("--skip-hd", action="store_true", help="跳过高清切换（fz 有效）")
+    # UI 抓取策略（天肿/复肿；tz/fz）参数
+    ap.add_argument("--skip-hd", action="store_true", help="跳过高清切换（复肿 fz 有效）")
     ap.add_argument(
         "--hd-timeout-ms", type=int, default=10000, help="高清切换超时（毫秒）"
     )
-    ap.add_argument("--max-rounds", type=int, default=2, help="逐帧播放轮数上限（fz）")
     ap.add_argument(
-        "--step-wait-ms", type=int, default=25, help="逐帧间隔（毫秒）（fz）"
-    )
-    ap.add_argument("--quiet-checks", type=int, default=6, help="静默观察次数（fz）")
-    ap.add_argument(
-        "--quiet-step-ms", type=int, default=800, help="静默观察间隔（毫秒）（fz）"
+        "--max-rounds", type=int, default=2, help="逐帧播放轮数上限（复肿 fz）"
     )
     ap.add_argument(
-        "--max-inflight", type=int, default=6, help="抓取/写盘最大并发（fz）"
+        "--step-wait-ms", type=int, default=25, help="逐帧间隔（毫秒）（复肿 fz）"
+    )
+    ap.add_argument("--quiet-checks", type=int, default=6, help="静默观察次数（复肿 fz）")
+    ap.add_argument(
+        "--quiet-step-ms", type=int, default=800, help="静默观察间隔（毫秒）（复肿 fz）"
     )
     ap.add_argument(
-        "--overwrite", action="store_true", help="若输出目录存在则先删除（fz）"
+        "--max-inflight", type=int, default=6, help="抓取/写盘最大并发（复肿 fz）"
+    )
+    ap.add_argument(
+        "--overwrite", action="store_true", help="若输出目录存在则先删除（复肿 fz）"
     )
 
     # cloud-dicom-downloader（子进程）参数
@@ -105,19 +110,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="cloud provider 失败/调试时保留临时目录（打印路径）",
     )
 
-    # NYFY（WS+h5Cache）参数
-    ap.add_argument("--nyfy-concurrency", type=int, default=2, help="NYFY 下载并发")
+    # 宁夏总医院（nyfy；WS+h5Cache）参数
     ap.add_argument(
-        "--nyfy-download-retries", type=int, default=4, help="NYFY 重试次数"
+        "--nyfy-concurrency", type=int, default=2, help="宁夏总医院（nyfy）下载并发"
     )
     ap.add_argument(
-        "--nyfy-http-timeout-ms", type=int, default=60000, help="NYFY HTTP 超时"
+        "--nyfy-download-retries", type=int, default=4, help="宁夏总医院（nyfy）重试次数"
     )
     ap.add_argument(
-        "--nyfy-retry-backoff-ms", type=int, default=250, help="NYFY 重试退避（毫秒）"
+        "--nyfy-http-timeout-ms",
+        type=int,
+        default=60000,
+        help="宁夏总医院（nyfy）HTTP 超时",
     )
-    ap.add_argument("--nyfy-backfill-rounds", type=int, default=5, help="NYFY 回填轮数")
-    ap.add_argument("--nyfy-verify", action="store_true", help="NYFY 下载后校验 DICOM")
+    ap.add_argument(
+        "--nyfy-retry-backoff-ms",
+        type=int,
+        default=250,
+        help="宁夏总医院（nyfy）重试退避（毫秒）",
+    )
+    ap.add_argument(
+        "--nyfy-backfill-rounds", type=int, default=5, help="宁夏总医院（nyfy）回填轮数"
+    )
+    ap.add_argument(
+        "--nyfy-verify", action="store_true", help="宁夏总医院（nyfy）下载后校验 DICOM"
+    )
     ap.add_argument("--nyfy-no-verify", dest="nyfy_verify", action="store_false")
     ap.set_defaults(nyfy_verify=False)
 
@@ -131,7 +148,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 async def run_tz_one(url: str, out_dir: str, mode: str, headless: bool):
-    # 延迟导入：避免在仅运行 fz/nyfy 时引入 tz 的重依赖（如 pydicom/numpy）
+    # 延迟导入：避免在仅运行复肿/宁夏总医院时引入天肿的重依赖（如 pydicom/numpy）
     import tjmucih_download_dicom as tz_mod
 
     await tz_mod.run_downloader(
