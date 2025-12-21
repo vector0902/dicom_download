@@ -84,6 +84,7 @@ python multi_download.py \
 
 ### cloud provider（融合 cloud-dicom-downloader，上游已停止维护）
 说明：
+- 上游项目 `cloud-dicom-downloader` 作者已明确 **不再更新/不再维护**，本项目以“兼容层”的方式融合其能力，便于继续扩展更多站点。
 - `multi_download.py` 会对部分域名自动路由到 `cloud` provider（也可 `--provider cloud` 强制）。
 - cloud provider 使用“子进程方式（方式B）”运行上游 `cloud-dicom-downloader/downloader.py`：
   - 子进程在**临时工作目录**运行，上游会写死输出到 `./download/...`
@@ -115,6 +116,7 @@ python multi_download.py --url "<URL>" --provider cloud --cloud-password "<PWD>"
 ### 注意事项
 - 不要提交任何包含 PHI/敏感信息的数据样本。
 - 不同站点 UI 有差异，若遇到选择器变更或策略不适配，可反馈或调整对应脚本的选择器/策略参数。
+- cloud provider 依赖上游已停止维护的实现，若与本项目已有实现（tz/fz/nyfy）重叠，则优先以本项目实现为准。
 
 ### 贡献
 - 如何新增一家医院/厂商适配，请参见 `CONTRIBUTING.md`。
