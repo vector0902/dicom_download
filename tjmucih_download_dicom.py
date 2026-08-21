@@ -140,12 +140,45 @@ async def read_series_list(page):
 # 说明：Mobile 版（URL 含 /mobile）序列列表在底部 footer 点"序列"按钮展开，
 # 每个序列是一个 div.listitem.el-col（内含两个 span.itemname）
 # 点击某个 listitem 后自动进入 viewer 模式（列表收起、"下一页"按钮可见）。
+# 固定节奏：点"序列"展开 -> 等1秒 -> 点目标序列 -> 等"影像ID:"出现确认加载
+#         -> 走片 -> 点"序列"收起 -> 等1秒 -> 下一个序列
+
+
+async def wait_series_footer_visible(page):
+    """
+    Mobile 版：等待底部 footer"序列"按钮渲染出来。
+    站点打开 URL 就开始加载图片，按钮可能稍后出现，必须等它可点击。
+    """
+    footer = page.locator("div.footer-li").filter(has_text="序列")
+    await footer.first.wait_for(state="visible", timeout=220000)
+    return footer
+
+
+async def click_series_footer(page):
+    """Mobile 版：点击底部 footer"序列"按钮（先等它可点击）。"""
+    footer = await wait_series_footer_visible(page)
+    await footer.first.click()
+
+
+async def wait_imagedid(page, timeout_s=30):
+    """
+    等待 viewer 顶部出现"影像ID:"文本 = 当前序列已加载完成。
+    返回该文本附近的一行摘要, 超时返回 None。
+    """
+    for _ in range(timeout_s * 2):
+        txt = await page.evaluate("() => document.body.innerText")
+        lines = [l.strip() for l in txt.splitlines()]
+        for i, line in enumerate(lines):
+            if line.startswith("影像ID:"):
+                return " | ".join(lines[i - 1:i + 8])
+        await page.wait_for_timeout(500)
+    return None
 
 
 async def open_series_panel_mobile(page):
     """
     Mobile 版：确保序列列表处于展开状态。
-    若 .listitem 已可见则直接返回；否则点击底部 footer"序列"按钮展开。
+    若 .listitem 已可见则直接返回；否则点 footer"序列"展开，等 1 秒并确认可见。
     """
     items = page.locator(".listitem")
     if await items.count() > 0 and await items.first.is_visible():
@@ -155,13 +188,18 @@ async def open_series_panel_mobile(page):
     # 若页面被"分享密码/登录校验"拦住，需要手动完成后才能进入 viewer。
     # 这里把等待窗口拉长，避免来不及输入就失败。
     print(">>> 如页面需要密码/登录，请在浏览器里完成验证（脚本将等待最多 220 秒）...")
-    await page.wait_for_selector(".listitem", state="attached", timeout=220000)
-
-    # 点击底部 footer"序列"按钮展开列表
-    footer = page.locator("div.footer-li").filter(has_text="序列")
-    await footer.first.click()
+    await click_series_footer(page)
+    await page.wait_for_timeout(1000)
+    if await items.count() == 0:
+        await page.wait_for_selector(".listitem", state="attached", timeout=220000)
     await items.first.wait_for(state="visible", timeout=30000)
     print(">>> 序列列表已展开")
+
+
+async def close_series_panel_mobile(page):
+    """Mobile 版：点 footer"序列"收起列表，并等 1 秒供动画完成。"""
+    await click_series_footer(page)
+    await page.wait_for_timeout(1000)
 
 
 async def read_series_list_mobile(page):
@@ -356,12 +394,18 @@ async def run_downloader(
             )
 
             if page_version == "mobile":
-                # Mobile 版：展开列表 → 点击目标序列（自动进入 viewer，列表收起）
+                # Mobile 版固定节奏：展开列表 → 点目标序列 → 等"影像ID:"确认加载
                 await open_series_panel_mobile(page)
                 items = page.locator(".listitem")
                 btn = items.nth(info["index"])
                 await btn.scroll_into_view_if_needed()
                 await btn.click()
+                # 等待该序列 viewer 加载完成（"影像ID:"出现）
+                loaded = await wait_imagedid(page)
+                if not loaded:
+                    print("    [!] '影像ID:' 未出现，该序列 viewer 可能未加载")
+                else:
+                    print(f"    viewer 已加载: {loaded}")
             else:
                 # PC 版：直接点击右侧序列按钮
                 await open_series_panel(page)
@@ -408,6 +452,11 @@ async def run_downloader(
                 )
                 if no_change_rounds >= 2:
                     break
+
+            # Mobile 版固定节奏：本序列走片完成 → 点"序列"收起列表，等 1 秒供动画完成
+            if page_version == "mobile":
+                await close_series_panel_mobile(page)
+                print("    >> 序列列表已收起")
 
         print("\n>>> 所有序列“走片”结束")
 
