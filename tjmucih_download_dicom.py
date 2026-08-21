@@ -177,19 +177,15 @@ async def wait_imagedid(page, timeout_s=30):
 
 async def open_series_panel_mobile(page):
     """
-    Mobile 版：确保序列列表处于展开状态。
-    若 .listitem 已可见则直接返回；否则点 footer"序列"展开，等 1 秒并确认可见。
+    Mobile 版：严格复刻 demo 节奏——无条件点 footer"序列"展开列表，等 1 秒并确认可见。
+    不做任何"已展开就跳过"的短路判断，保证每轮节奏完整一致。
     """
-    items = page.locator(".listitem")
-    if await items.count() > 0 and await items.first.is_visible():
-        print(">>> 序列列表已展开")
-        return
-
     # 若页面被"分享密码/登录校验"拦住，需要手动完成后才能进入 viewer。
     # 这里把等待窗口拉长，避免来不及输入就失败。
     print(">>> 如页面需要密码/登录，请在浏览器里完成验证（脚本将等待最多 220 秒）...")
     await click_series_footer(page)
     await page.wait_for_timeout(1000)
+    items = page.locator(".listitem")
     if await items.count() == 0:
         await page.wait_for_selector(".listitem", state="attached", timeout=220000)
     await items.first.wait_for(state="visible", timeout=30000)
@@ -396,14 +392,21 @@ async def run_downloader(
             )
 
             if page_version == "mobile":
-                # Mobile 版固定节奏：展开列表 → 点目标序列 → 等"影像ID:"确认加载
+                # Mobile 版固定节奏：展开列表 → 等列表稳定 → 点目标序列 → 确认切换完成
                 await open_series_panel_mobile(page)
+                # 点击前等 1 秒，让列表展开动画稳定（demo 验证的关键）
+                await page.wait_for_timeout(1000)
                 items = page.locator(".listitem")
                 btn = items.nth(info["index"])
                 await btn.scroll_into_view_if_needed()
                 await btn.click()
-                # 等待该序列 viewer 加载完成（"影像ID:"出现）
+                # 等待该序列 viewer 加载完成
                 loaded = await wait_imagedid(page)
+                # 等列表收起（进入 viewer 模式），防止"下一页"被列表遮挡无法点击
+                for _ in range(10):
+                    if not await items.first.is_visible():
+                        break
+                    await page.wait_for_timeout(500)
                 if not loaded:
                     print("    [!] '影像ID:' 未出现，该序列 viewer 可能未加载")
                 else:
