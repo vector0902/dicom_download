@@ -54,6 +54,22 @@ def classify_series_by_dicom(desc: str, body_part: str) -> str:
     return "diag"
 
 
+# ================== 页面版本检测（PC / Mobile） ==================
+
+
+async def detect_page_version(page) -> str:
+    """
+    检测当前页面是 PC 版还是 Mobile 版：
+    - PC 版：右侧有 div.listbtn button.rightbutton
+    - Mobile 版：URL 含 /mobile，序列列表为 .listitem（底部 footer 切换显示）
+    """
+    if await page.locator("div.listbtn button.rightbutton").count() > 0:
+        return "pc"
+    if "mobile" in page.url or await page.locator(".listitem").count() > 0:
+        return "mobile"
+    return "pc"
+
+
 # ================== 序列面板（PC 版右侧列表） ==================
 
 
@@ -67,7 +83,7 @@ async def open_series_panel(page):
     # 若页面被“分享密码/登录校验”拦住，需要你在浏览器里手动完成后才能进入 viewer。
     # 这里把等待窗口拉长到与 nyfy 类似的 120s，避免 20s 来不及输入就失败。
     print(">>> 如页面需要密码/登录，请在浏览器里完成验证（脚本将等待最多 120 秒）...")
-    await buttons.first.wait_for(state="visible", timeout=120000)
+    await buttons.first.wait_for(state="visible", timeout=220000)
     print(">>> 序列面板已就绪")
 
 
@@ -109,6 +125,81 @@ async def read_series_list(page):
         result.append(
             {
                 "index": i,  # 在右侧列表中的索引
+                "series_no": series_no,
+                "ui_desc": desc,
+                "ui_folder": folder_name,
+                "num_images_from_card": num_images,
+                "ui_category": category,  # "diag" or "nondiag"
+            }
+        )
+
+    return result
+
+
+# ================== 序列面板（Mobile 版底部序列列表切换） ==================
+# 说明：Mobile 版（URL 含 /mobile）序列列表在底部 footer 点"序列"按钮展开，
+# 每个序列是一个 div.listitem.el-col（内含两个 span.itemname）
+# 点击某个 listitem 后自动进入 viewer 模式（列表收起、"下一页"按钮可见）。
+
+
+async def open_series_panel_mobile(page):
+    """
+    Mobile 版：确保序列列表处于展开状态。
+    若 .listitem 已可见则直接返回；否则点击底部 footer"序列"按钮展开。
+    """
+    items = page.locator(".listitem")
+    if await items.count() > 0 and await items.first.is_visible():
+        print(">>> 序列列表已展开")
+        return
+
+    # 若页面被"分享密码/登录校验"拦住，需要手动完成后才能进入 viewer。
+    # 这里把等待窗口拉长，避免来不及输入就失败。
+    print(">>> 如页面需要密码/登录，请在浏览器里完成验证（脚本将等待最多 220 秒）...")
+    await page.wait_for_selector(".listitem", state="attached", timeout=220000)
+
+    # 点击底部 footer"序列"按钮展开列表
+    footer = page.locator("div.footer-li").filter(has_text="序列")
+    await footer.first.click()
+    await items.first.wait_for(state="visible", timeout=30000)
+    print(">>> 序列列表已展开")
+
+
+async def read_series_list_mobile(page):
+    """
+    Mobile 版：从 .listitem 读取所有 series 信息。
+
+    HTML 结构大致为（每个序列）：
+      <div class="listitem el-col el-col-12">
+        <span class="itemname">序列数量：714</span>
+        <span class="itemname">序列1</span>
+        <div class="dcm" id="dcm0"><canvas class="cornerstone-canvas"></canvas></div>
+      </div>
+    """
+    await open_series_panel_mobile(page)
+
+    items = page.locator(".listitem")
+    count = await items.count()
+    print(f">>> 共检测到 {count} 个 series")
+
+    result = []
+    for i in range(count):
+        text = (await items.nth(i).inner_text()).strip()
+
+        # 序列数量：XXX
+        m_qty = re.search(r"序列数量：(\d+)", text)
+        num_images = int(m_qty.group(1)) if m_qty else None
+
+        # 序列N
+        m_seq = re.search(r"序列(\d+)", text)
+        series_no = m_seq.group(1) if m_seq else str(i + 1)
+
+        desc = f"序列{series_no}_数量{num_images if num_images is not None else '未知'}"
+        category = classify_series_by_ui(num_images)
+        folder_name = f"series_{series_no}_{safe_name(desc)}"
+
+        result.append(
+            {
+                "index": i,  # 在序列列表中的索引
                 "series_no": series_no,
                 "ui_desc": desc,
                 "ui_folder": folder_name,
@@ -233,10 +324,14 @@ async def run_downloader(
         page = await context.new_page()
         print(f">>> 打开检查页面: {check_url}")
         # 拉长导航超时，避免遇到密码/登录校验或网络波动时过早失败
-        await page.goto(check_url, wait_until="networkidle", timeout=120000)
+        await page.goto(check_url, wait_until="networkidle", timeout=320000)
 
         # 读取 UI 序列列表，用来“走片”触发剩余切片的加载
-        series_list = await read_series_list(page)
+        page_version = await detect_page_version(page)
+        if page_version == "mobile":
+            series_list = await read_series_list_mobile(page)
+        else:
+            series_list = await read_series_list(page)
 
         # 按 UI 粗略分类做一次过滤（只影响“点哪些序列”，不影响 DICOM 分组）
         if download_mode == "diag":
@@ -260,11 +355,20 @@ async def run_downloader(
                 f"打开 UI 序列 {info['series_no']}：{info['ui_desc']} ==="
             )
 
-            await open_series_panel(page)
-            buttons = page.locator("div.listbtn button.rightbutton")
-            btn = buttons.nth(info["index"])
-            await btn.scroll_into_view_if_needed()
-            await btn.click()
+            if page_version == "mobile":
+                # Mobile 版：展开列表 → 点击目标序列（自动进入 viewer，列表收起）
+                await open_series_panel_mobile(page)
+                items = page.locator(".listitem")
+                btn = items.nth(info["index"])
+                await btn.scroll_into_view_if_needed()
+                await btn.click()
+            else:
+                # PC 版：直接点击右侧序列按钮
+                await open_series_panel(page)
+                buttons = page.locator("div.listbtn button.rightbutton")
+                btn = buttons.nth(info["index"])
+                await btn.scroll_into_view_if_needed()
+                await btn.click()
 
             # 给第一张图一点加载时间
             await page.wait_for_timeout(400)
