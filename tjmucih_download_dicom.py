@@ -266,7 +266,9 @@ async def run_downloader(
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=headless)
-        context = await browser.new_context(viewport={"width": 1400, "height": 900})
+        # 不主动设置 viewport：让浏览器用真实窗口尺寸，
+        # 避免固定高度(900)超过 DISPLAY 屏幕高度导致底部 footer 栏被裁掉。
+        context = await browser.new_context()
 
         # -------- DICOM 分组：完全基于 DICOM 标签，不再依赖“当前序列” --------
         seen_urls_global: set[str] = set()
